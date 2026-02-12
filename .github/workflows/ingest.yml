@@ -5,11 +5,11 @@ permissions:
 
 concurrency:
   group: market-data
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/5 * * * *"   # Every 5 minutes
   workflow_dispatch:
 
 jobs:
@@ -17,16 +17,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # Important for pull --rebase to work
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
 
       - name: Run ingestion script
         run: python fetch_market_data.py
@@ -35,7 +39,16 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
+
+          # Pull latest changes safely
           git pull origin main --rebase
+
           git add raw_prices.csv
-          git diff --quiet && git diff --staged --quiet || git commit -m "Auto-update market data"
-          git push origin main
+
+          # Only commit if changes exist
+          if ! git diff --staged --quiet; then
+            git commit -m "Auto-update market data"
+            git push origin main
+          else
+            echo "No changes to commit"
+          fi
