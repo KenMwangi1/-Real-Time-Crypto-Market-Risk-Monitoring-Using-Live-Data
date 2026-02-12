@@ -1,6 +1,5 @@
 import requests
 import pandas as pd
-import time
 import os
 from datetime import datetime, timezone
 
@@ -19,17 +18,14 @@ PARAMS = {
     "sparkline": "false"
 }
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-OUTPUT_FILE = os.path.join(BASE_DIR, "raw_prices.csv")
-
-FETCH_INTERVAL_SECONDS = 300  # 5 minutes
+OUTPUT_FILE = "raw_prices.csv"
 
 HEADERS = {
     "User-Agent": "market-risk-monitor/1.0"
 }
 
 # =========================
-# FETCH FUNCTION
+# FETCH DATA
 # =========================
 
 def fetch_market_snapshot():
@@ -37,14 +33,15 @@ def fetch_market_snapshot():
         API_URL,
         params=PARAMS,
         headers=HEADERS,
-        timeout=10
+        timeout=15
     )
     response.raise_for_status()
-    data = response.json()
 
+    data = response.json()
     timestamp = datetime.now(timezone.utc)
 
     records = []
+
     for coin in data:
         records.append({
             "asset_id": coin["id"],
@@ -62,48 +59,43 @@ def fetch_market_snapshot():
 
 def append_to_csv(df_new):
     """
-    Append new records to CSV safely.
-    Never overwrites existing data.
+    Append new records safely.
+    Creates file if missing.
+    Avoids total overwrite.
     """
+
     file_exists = os.path.exists(OUTPUT_FILE)
 
-    df_new.to_csv(
-        OUTPUT_FILE,
-        mode="a",                 # append mode
-        header=not file_exists,   # write header only once
-        index=False
+    try:
+        df_new.to_csv(
+            OUTPUT_FILE,
+            mode="a",
+            header=not file_exists,
+            index=False
+        )
+    except Exception as e:
+        print(f"ERROR writing to CSV: {e}")
+        raise
+
+# =========================
+# MAIN EXECUTION
+# =========================
+
+def main():
+    print("Starting single-run ingestion...")
+
+    df_snapshot = fetch_market_snapshot()
+
+    if df_snapshot.empty:
+        print("No data returned from API.")
+        return
+
+    append_to_csv(df_snapshot)
+
+    print(
+        f"[{datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC] "
+        f"Fetched {len(df_snapshot)} records successfully."
     )
 
-# =========================
-# MAIN LOOP
-# =========================
-
-def run_pipeline():
-    print("Starting market data ingestion...")
-    print(f"Saving data to: {OUTPUT_FILE}")
-    print("Fetching data every 5 minutes.\n")
-
-    try:
-        while True:
-            df_snapshot = fetch_market_snapshot()
-            append_to_csv(df_snapshot)
-
-            print(
-                f"[{datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC] "
-                f"Fetched {len(df_snapshot)} records."
-            )
-
-            time.sleep(FETCH_INTERVAL_SECONDS)
-
-    except KeyboardInterrupt:
-        print("\nPipeline stopped gracefully.")
-
-    except Exception as e:
-        print(f"FATAL ERROR: {e}")
-
-# =========================
-# ENTRY POINT
-# =========================
-
 if __name__ == "__main__":
-    run_pipeline()
+    main()
