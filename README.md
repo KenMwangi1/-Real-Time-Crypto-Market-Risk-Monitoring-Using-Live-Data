@@ -175,5 +175,7 @@ _Step 4: Visualization & BI Layer (Power BI)_
 
 #### Ken Mwangi 
 Data Engineer | Machine Learning Engineer | AWS Certified | Data Analyst
+
 Portfolio website: https://KenMwangi1.github.io/
+
 LinkedIn: https://www.linkedin.com/in/ken-mwangi-81478028/
